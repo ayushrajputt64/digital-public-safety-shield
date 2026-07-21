@@ -12,15 +12,28 @@ that both models agree on gets high confidence; disagreement is flagged
 for human review rather than silently resolved -- this matters because
 citizen-facing false positives must stay very low (explicit evaluation
 criterion in the brief).
+
+FIX APPLIED: fused score is now explicitly clamped to [0, 1] before verdict
+thresholding. With the current weights this was already mathematically
+bounded, but leaving it implicit is fragile -- any future change to
+ML_WEIGHT/RULE_WEIGHT or the compound-risk override could silently push
+fused_score above 1.0 (which, e.g., broke st.progress() in the dashboard
+before the app-side clamp was added). Clamping once here, at the source,
+is the correct place to guarantee the invariant rather than relying on
+every downstream consumer to re-clamp defensively.
 """
 
 import os
 import joblib
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 
-from backend.signal_detector import compute_rule_score, detect_signals
+from backend.signal_detector import (
+    compute_rule_score,
+    generate_explanations,
+    detect_scam_type,
+)
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_DIR = os.path.join(BASE, "models")
@@ -43,10 +56,16 @@ class ScamVerdict:
     ml_score: float
     rule_score: float
     fused_score: float
-    verdict: str            # "HIGH_RISK", "MEDIUM_RISK", "LOW_RISK"
+    verdict: str            # HIGH_RISK / MEDIUM_RISK / LOW_RISK
     compound_risk: bool
-    matched_categories: list
+    matched_categories: list[str]
     timestamp: str
+
+    scam_type: str = "Unknown"
+
+    explanations: list[str] = field(default_factory=list)
+
+    matched_signals: list[dict] = field(default_factory=list)
 
     def to_dict(self):
         return asdict(self)
@@ -68,6 +87,10 @@ def analyze_transcript(text: str) -> ScamVerdict:
 
     rule_score, matches, compound_risk = compute_rule_score(text)
 
+    explanations = generate_explanations(matches)
+
+    scam_type = detect_scam_type(matches)
+
     fused = ML_WEIGHT * ml_score + RULE_WEIGHT * rule_score
 
     # Compound risk override: if 3+ independent rule categories co-occur,
@@ -75,6 +98,10 @@ def analyze_transcript(text: str) -> ScamVerdict:
     # mirrors "compound risk detection" language from the problem statement.
     if compound_risk:
         fused = max(fused, 0.75)
+
+    # Defensive clamp -- guarantees the invariant at the source instead of
+    # relying on every downstream consumer (UI, alerting, logging) to do it.
+    fused = min(max(fused, 0.0), 1.0)
 
     if fused >= HIGH_RISK_THRESHOLD:
         verdict = "HIGH_RISK"
@@ -90,7 +117,21 @@ def analyze_transcript(text: str) -> ScamVerdict:
         fused_score=round(fused, 4),
         verdict=verdict,
         compound_risk=compound_risk,
-        matched_categories=[m.category for m in matches],
+        matched_categories=sorted({m.category for m in matches}),
+
+        scam_type=scam_type,
+
+        explanations=explanations,
+
+        matched_signals=[
+            {
+                "category": m.category,
+                "weight": round(m.weight, 2),
+                "patterns": m.matched_phrases,
+            }
+            for m in matches
+        ],
+
         timestamp=datetime.now(timezone.utc).isoformat() + "Z",
     )
 
