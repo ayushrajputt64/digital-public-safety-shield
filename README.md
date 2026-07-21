@@ -69,7 +69,7 @@ templates is misleading:
 | Test set | Accuracy | Notes |
 |---|---|---|
 | Held-out split of training data | 100% | Same template family as training — expected to be high, not a generalization claim |
-| **Independent adversarial set** (60 hand-written cases, never seen in training) | **98.3%** (59/60) | The number we stand behind. 30 scam / 30 legit, spanning digital arrest scams AND phishing scams, plus Hinglish phrasing. 1 false positive (legit OTP warning), 0 false negatives |
+| **Independent adversarial set** (60 hand-written cases, never seen in training) | **95** (57/60) | The number we stand behind. 30 scam / 30 legit, spanning digital arrest scams AND phishing scams, plus Hinglish phrasing. 3 false positive (legit OTP warning), 0 false negatives |
 
 Run `python3 -m backend.detection_engine` to reproduce the adversarial evaluation.
 
