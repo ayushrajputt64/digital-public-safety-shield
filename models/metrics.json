@@ -1,0 +1,52 @@
+{
+  "accuracy": 1.0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1_score": 1.0,
+  "roc_auc": 1.0,
+  "test_set_size": 210,
+  "confusion_matrix": [
+    [
+      90,
+      0
+    ],
+    [
+      0,
+      120
+    ]
+  ],
+  "top_scam_indicators": [
+    "account",
+    "verify",
+    "kyc",
+    "will be",
+    "be",
+    "in",
+    "update",
+    "immediately",
+    "will",
+    "and",
+    "activity",
+    "bank account",
+    "do",
+    "do not",
+    "number"
+  ],
+  "top_legit_indicators": [
+    "good",
+    "hi",
+    "no",
+    "action",
+    "time",
+    "hey",
+    "hi this",
+    "me",
+    "needed",
+    "portal",
+    "about your",
+    "tomorrow",
+    "hello",
+    "day",
+    "thanks for"
+  ]
+}
